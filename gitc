@@ -1,0 +1,156 @@
+#!/bin/bash -e
+command=${1:-local}
+
+# Usage: pad_string LENGTH {PADDING_CHARACTER=' '}
+function pad_string {
+	local line=''
+	local length=$1
+	local padding_character=' '
+	if [[ "$2" != "" ]]; then
+		padding_character=$2
+	fi
+	while((${#line} < $length)); do
+		line="$line$padding_character"
+	done
+	echo -n "$line"
+}
+
+# Usage: left_justify MESSAGE LENGTH {PADDING_CHARACTER=' '}
+function left_justify {
+	local message=$1
+	local length=$2
+	local padding_character='='
+	if [[ "$3" != "" ]]; then
+		padding_character=$3
+	fi
+	echo "$message$(pad_string $length-${#message} $padding_character)"
+}
+
+function log.header {
+	lengthTail=$(expr 64 - ${#1} - ${#2})
+	tail=$(left_justify "" $lengthTail "=")
+	echo -ne "\e[97m==== \e[100m$1\e[49m \e[97m$tail\e[0m (\e[35m$2\e[0m|"
+}
+
+function log.status {
+	if [ "$1" == "clean" ]; then
+		echo -ne "\e[32m✔"
+	elif [ "$1" == "dirty" ]; then
+		echo -ne "\e[33m●"
+	elif [ "$1" == "error" ]; then
+		echo -ne "\e[31m✖"
+	fi
+	echo -e "\e[0m)"
+}
+
+function log.update {
+	echo -e "     \e[34mWill be updated\e[0m (is $1 behind)"
+}
+
+function log.dirty {
+	echo -e "     \e[93mNeeds to be updated \e[0m (is $1 behind)"
+}
+
+function log.info {
+	echo -e "     \e[92m$1\e[0m"
+}
+
+function log.warn {
+	echo -e "     \e[93m$1\e[0m"
+}
+
+function log.error {
+	echo -e "     \e[91m$1\e[0m"
+}
+
+
+# Returns "*" if the current git branch is dirty.
+function isDirty {
+	#[[ $(git diff --shortstat 2> /dev/null | tail -n1) != "" ]] && echo "*"
+	echo `cd $1; git status --porcelain`
+}
+
+# Returns the number of untracked files
+#function numUntrackedFiles {
+#	expr `git status --porcelain 2>/dev/null| grep "^??" | wc -l` 
+#}
+
+function getCurrentBranch {
+	(cd $1; git rev-parse --abbrev-ref HEAD)
+}
+
+function printLastLogs {
+	#(cd $1; git --no-pager log --oneline -n $2)
+	(cd $1; git --no-pager log --pretty='format:%C(yellow)%h%Creset %C(blue)%ar%Creset%C(green)%d%Creset %s %C(dim normal)(%an)%Creset' -n $2)
+	echo ""
+}
+
+function printLocalChanges {
+	# print changes in short form
+	(cd $1; git status -s)
+}
+
+
+function mergeDirectory {
+	(cd $1; git merge 2>&1 > /dev/null)
+}
+
+
+function checkCommand {
+	if [ "$1" != "local" -a "$1" != "fetch" -a "$1" != "pull" ]; then
+		echo "Invalid command: '$1'"
+		exit 1
+	fi
+}
+
+checkCommand $command
+# iterate thru all directories
+for dir in `ls -1 --color=never -d *`; do
+	# check if is directy by checking if contains .git directory
+	if [ -d $dir/.git ]; then
+		log.header $dir `getCurrentBranch $dir`
+
+		if [ "$command" == "fetch" -o "$command" == "pull" ]; then
+			fetchCode=$(cd $dir ; git fetch -q 2> /dev/null ; echo $?)
+			if [ "$fetchCode" == "0" ]; then
+				behind=`cd $dir; git rev-list HEAD...origin/master --count`
+
+				if [ "$behind" != "0" ]; then
+					if [ "$command" == "fetch" ]; then
+						log.status "dirty"
+						log.dirty $behind
+						printLastLogs $dir $behind
+					elif [ "$command" == "pull" ]; then
+						if [[ `isDirty $dir` ]]; then
+							log.status "error"
+							log.error "Can not be merged: local changes"
+							printLocalChanges $dir
+						else
+							log.status "dirty"
+							log.update $behind
+							mergeDirectory $dir
+							printLastLogs $dir $behind
+						fi
+					fi
+				else
+					log.status "clean"
+					#log.info "No changes"
+				fi
+
+			else
+				log.status "error"
+				log.error "Could not be fetched!"
+			fi
+		elif [ "$command" == "local" ]; then
+			if [[ `isDirty $dir` ]]; then
+				log.status "dirty"
+				log.warn "Has local changes"
+				printLocalChanges $dir
+			else
+				log.status "clean"
+				#log.info "No changes"
+			fi
+		fi
+	fi
+done
+
