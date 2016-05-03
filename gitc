@@ -1,4 +1,7 @@
 #!/bin/bash -e
+# Usage gitc {local|fetch|pull}
+# Defaults to local
+
 command=${1:-local}
 
 # Usage: pad_string LENGTH {PADDING_CHARACTER=' '}
@@ -40,15 +43,11 @@ function log.status {
 	elif [ "$1" == "error" ]; then
 		echo -ne "\e[31m✖"
 	fi
-	echo -e "\e[0m)"
-}
-
-function log.update {
-	echo -e "     \e[34mWill be updated\e[0m (is $1 behind)"
-}
-
-function log.dirty {
-	echo -e "     \e[93mNeeds to be updated \e[0m (is $1 behind)"
+	echo -ne "\e[0m"
+	if [ -n "$2" ]; then
+		echo -n "↓$2"
+	fi
+	echo -e ")"
 }
 
 function log.info {
@@ -117,17 +116,15 @@ for dir in `ls -1 --color=never -d *`; do
 
 				if [ "$behind" != "0" ]; then
 					if [ "$command" == "fetch" ]; then
-						log.status "dirty"
-						log.dirty $behind
+						log.status "dirty" $behind
 						printLastLogs $dir $behind
 					elif [ "$command" == "pull" ]; then
 						if [[ `isDirty $dir` ]]; then
-							log.status "error"
+							log.status "error" $behind
 							log.error "Can not be merged: local changes"
 							printLocalChanges $dir
 						else
-							log.status "dirty"
-							log.update $behind
+							log.status "dirty" $behind
 							mergeDirectory $dir
 							printLastLogs $dir $behind
 						fi
