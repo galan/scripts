@@ -98,13 +98,33 @@ function mergeDirectory {
 function checkCommand {
 	if [ "$1" != "local" -a "$1" != "fetch" -a "$1" != "pull" ]; then
 		echo "Invalid command: '$1'"
+		echo -e "Usage: gitc [\e[4mlocal\e[0m|fetch|pull]"
 		exit 1
 	fi
 }
 
+
+function checkDirectory {
+	if [ -z "${dirs}" ]; then
+		echo -e "No git repositories found. gitc must \e[4mnot\e[0m be performed inside a git-repository, but in the directory above."
+		exit 2
+	fi
+}
+
+
+function getGitDirectories {
+	for dir in `ls -1 --color=never -d */.git 2> /dev/null`; do
+		echo "${dir%/*}"
+	done
+}
+
+
 checkCommand $command
+dirs=`getGitDirectories`
+checkDirectory
+
 # iterate thru all directories
-for dir in `ls -1 --color=never -d *`; do
+for dir in $dirs; do
 	# check if is directy by checking if contains .git directory
 	if [ -d $dir/.git ]; then
 		log.header $dir `getCurrentBranch $dir`
