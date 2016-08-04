@@ -32,18 +32,18 @@ function left_justify {
 function log.header {
 	lengthTail=$(expr 64 - ${#1} - ${#2})
 	tail=$(left_justify "" $lengthTail "=")
-	echo -ne "\e[97m==== \e[100m$1\e[49m \e[97m$tail\e[0m (\e[35m$2\e[0m|"
+	echo -ne "\x1B[97m==== \x1B[100m$1\x1B[49m \x1B[97m$tail\x1B[0m (\x1B[35m$2\x1B[0m|"
 }
 
 function log.status {
 	if [ "$1" == "clean" ]; then
-		echo -ne "\e[32m✔"
+		echo -ne "\x1B[32m✔"
 	elif [ "$1" == "dirty" ]; then
-		echo -ne "\e[33m●"
+		echo -ne "\x1B[33m●"
 	elif [ "$1" == "error" ]; then
-		echo -ne "\e[31m✖"
+		echo -ne "\x1B[31m✖"
 	fi
-	echo -ne "\e[0m"
+	echo -ne "\x1B[0m"
 	if [ -n "$2" ]; then
 		echo -n "↓$2"
 	fi
@@ -51,15 +51,15 @@ function log.status {
 }
 
 function log.info {
-	echo -e "     \e[92m$1\e[0m"
+	echo -e "     \x1B[92m$1\x1B[0m"
 }
 
 function log.warn {
-	echo -e "     \e[93m$1\e[0m"
+	echo -e "     \x1B[93m$1\x1B[0m"
 }
 
 function log.error {
-	echo -e "     \e[91m$1\e[0m"
+	echo -e "     \x1B[91m$1\x1B[0m"
 }
 
 
@@ -98,7 +98,7 @@ function mergeDirectory {
 function checkCommand {
 	if [ "$1" != "local" -a "$1" != "fetch" -a "$1" != "pull" ]; then
 		echo "Invalid command: '$1'"
-		echo -e "Usage: gitc [\e[4mlocal\e[0m|fetch|pull]"
+		echo -e "Usage: gitc [\x1B[4mlocal\x1B[0m|fetch|pull]"
 		exit 1
 	fi
 }
@@ -106,14 +106,14 @@ function checkCommand {
 
 function checkDirectory {
 	if [ -z "${dirs}" ]; then
-		echo -e "No git repositories found. gitc must \e[4mnot\e[0m be performed inside a git-repository, but in the directory above."
+		echo -e "No git repositories found. gitc must \x1B[4mnot\x1B[0m be performed inside a git-repository, but in the directory above."
 		exit 2
 	fi
 }
 
 
 function getGitDirectories {
-	for dir in `ls -1 --color=never -d */.git 2> /dev/null`; do
+	for dir in `ls -1 -d */.git 2> /dev/null`; do
 		echo "${dir%/*}"
 	done
 }
