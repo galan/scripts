@@ -6,11 +6,11 @@ amount=${1}
 
 function checkArgument {
 	if [[ ! ${1} =~ ^[0-9]{1,2}$ ]]; then
-	    echo "\e[93mGiven argument for amount of commits to squash is invalid, has to be a number\e[0m"
+	    echo -e "\x1B[93mGiven argument for amount of commits to squash is invalid, has to be a number\x1B[0m"
     	exit 1
 	fi
 	if [[ ${1} < 2 ]]; then
-	    echo "\e[93mGiven argument for amount of commits to squash is to small for squashing, has to be > 1\e[0m"
+	    echo -e "\x1B[93mGiven argument for amount of commits to squash is to small for squashing, has to be > 1\x1B[0m"
     	exit 1
 	fi 
 }
@@ -22,14 +22,14 @@ function isDirty {
 
 function checkIsDirty {
 	if [[ `isDirty $dir` ]]; then
-		echo -e "\e[93mDirectory contains uncommited changes\e[0m"
+		echo -e "\x1B[93mDirectory contains uncommited changes\x1B[0m"
 		exit 3
 	fi
 }
 
 function checkDirectory {
 	if [ ! -d "$PWD/.git" ]; then
-		echo -e "\e[93mgits has to be called inside a git directory\e[0m"
+		echo -e "\x1B[93mgits has to be called inside a git directory\x1B[0m"
 		exit 2
 	fi
 }
