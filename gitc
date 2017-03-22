@@ -135,18 +135,26 @@ for dir in $dirs; do
 				behind=`cd $dir; git rev-list HEAD...origin/master --count`
 
 				if [ "$behind" != "0" ]; then
-					if [ "$command" == "fetch" ]; then
-						log.status "dirty" $behind
-						printLastLogs $dir $behind
-					elif [ "$command" == "pull" ]; then
-						if [[ `isDirty $dir` ]]; then
-							log.status "error" $behind
-							log.error "Can not be merged: local changes"
-							printLocalChanges $dir
-						else
+					
+					currentBranch=`getCurrentBranch $dir`
+					remotesExisting=$(cd $dir; git ls-remote . refs/remotes/origin/$currentBranch | wc -l)
+					if [ "$remotesExisting" -eq "0" ]; then
+						log.status "clean" 
+						log.info "No remote for the current branch."
+					else
+						if [ "$command" == "fetch" ]; then
 							log.status "dirty" $behind
-							mergeDirectory $dir
 							printLastLogs $dir $behind
+						elif [ "$command" == "pull" ]; then
+							if [[ `isDirty $dir` ]]; then
+								log.status "error" $behind
+								log.error "Can not be merged: local changes"
+								printLocalChanges $dir
+							else
+								log.status "dirty" $behind
+								mergeDirectory $dir
+								printLastLogs $dir $behind
+							fi
 						fi
 					fi
 				else
