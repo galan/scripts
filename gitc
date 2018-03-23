@@ -69,13 +69,22 @@ function isDirty {
 	echo `cd $1; git status --porcelain`
 }
 
+# Returns "0" if the current git repository is empty (newly created)
+function isEmptyGitRepo {
+	echo `cd $1; find .git/objects -type f | wc -l`
+}
+
 # Returns the number of untracked files
 #function numUntrackedFiles {
 #	expr `git status --porcelain 2>/dev/null| grep "^??" | wc -l` 
 #}
 
 function getCurrentBranch {
-	(cd $1; git rev-parse --abbrev-ref HEAD)
+	if [ `isEmptyGitRepo $1` == "0" ]; then
+		echo "-"
+	else
+		(cd $1; git rev-parse --abbrev-ref HEAD)
+	fi
 }
 
 function printLastLogs {
@@ -132,10 +141,16 @@ for dir in $dirs; do
 		if [ "$command" == "fetch" -o "$command" == "pull" ]; then
 			fetchCode=$(cd $dir ; git fetch -q 2> /dev/null ; echo $?)
 			if [ "$fetchCode" == "0" ]; then
-				behind=`cd $dir; git rev-list HEAD...origin/master --count`
 
-				if [ "$behind" != "0" ]; then
-					
+				objects=`find $dir/.git/objects -type f | wc -l`
+				if [ "$objects" != "0" ]; then
+					behind=`cd $dir; git rev-list HEAD...origin/master --count`
+				fi
+
+				if [ "$objects" == "0" ]; then
+					log.status "error"
+					log.error "Empty git repository"
+				elif [ "$behind" != "0" ]; then
 					currentBranch=`getCurrentBranch $dir`
 					remotesExisting=$(cd $dir; git ls-remote . refs/remotes/origin/$currentBranch | wc -l)
 					if [ "$remotesExisting" -eq "0" ]; then
