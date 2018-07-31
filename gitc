@@ -100,7 +100,12 @@ function printLocalChanges {
 
 
 function mergeDirectory {
-	(cd $1; git merge 2>&1 > /dev/null)
+	isTrackingBranch=`cd $1; git rev-parse --abbrev-ref --symbolic-full-name @{u} 2>&1 > /dev/null ; echo $?`
+	if [ "$isTrackingBranch" ]; then
+		log.warn "Untracked branch, skipping"
+	else
+		(cd $1; git merge 2>&1 > /dev/null)
+	fi
 }
 
 
