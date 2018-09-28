@@ -110,9 +110,9 @@ function mergeDirectory {
 
 
 function checkCommand {
-	if [ "$1" != "local" -a "$1" != "fetch" -a "$1" != "pull" ]; then
+	if [ "$1" != "local" -a "$1" != "fetch" -a "$1" != "pull" -a "$1" != "prune" ]; then
 		echo "Invalid command: '$1'"
-		echo -e "Usage: gitc [\x1B[4mlocal\x1B[0m|fetch|pull]"
+		echo -e "Usage: gitc [\x1B[4mlocal\x1B[0m|fetch|pull|prune]"
 		exit 1
 	fi
 }
@@ -143,8 +143,12 @@ for dir in $dirs; do
 	if [ -d $dir/.git ]; then
 		log.header $dir `getCurrentBranch $dir`
 
-		if [ "$command" == "fetch" -o "$command" == "pull" ]; then
-			fetchCode=$(cd $dir ; git fetch -q 2> /dev/null ; echo $?)
+		if [ "$command" == "fetch" -o "$command" == "pull" -o "$command" == "prune" ]; then
+			if [ "$command" == "prune" ]; then
+				fetchParam="--prune"
+			fi
+			fetchCode=$(cd $dir ; git fetch $fetchParam -q 2> /dev/null ; echo $?)
+
 			if [ "$fetchCode" == "0" ]; then
 
 				objects=`find $dir/.git/objects -type f | wc -l`
