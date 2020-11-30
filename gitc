@@ -4,21 +4,6 @@
 
 command=${1:-local}
 
-# Usage: pad_string LENGTH {PADDING_CHARACTER=' '}
-function pad_string {
-	local line=''
-	local length=$1
-	local padding_character=' '
-	if [[ "$2" != "" ]]; then
-		padding_character=$2
-	fi
-	while((${#line} < $length)); do
-		line="$line$padding_character"
-	done
-	echo -n "$line"
-}
-
-# Usage: left_justify MESSAGE LENGTH {PADDING_CHARACTER=' '}
 function left_justify {
 	local message=$1
 	local length=$2
@@ -26,13 +11,15 @@ function left_justify {
 	if [[ "$3" != "" ]]; then
 		padding_character=$3
 	fi
-	echo "$message$(pad_string $length-${#message} $padding_character)"
+	lengthPadding=$(( length - ${#message} ))
+	printf "%0.s${padding_character}" $(seq 1 $lengthPadding)
 }
 
+
 function log.header {
-	lengthTail=$(expr 64 - ${#1} - ${#2})
+	lengthTail=$(( 64 - ${#1} - ${#2} ))
 	tail=$(left_justify "" $lengthTail "=")
-	echo -ne "\x1B[97m==== \x1B[100m$1\x1B[49m \x1B[97m$tail\x1B[0m (\x1B[35m$2\x1B[0m|"
+	echo -ne "\x1B[97m==== \x1B[30m\x1B[47m$1\x1B[49m \x1B[97m$tail\x1B[0m (\x1B[35m$2\x1B[0m|"
 }
 
 function log.status {
@@ -66,12 +53,12 @@ function log.error {
 # Returns "*" if the current git branch is dirty.
 function isDirty {
 	#[[ $(git diff --shortstat 2> /dev/null | tail -n1) != "" ]] && echo "*"
-	echo `cd $1; git status --porcelain`
+	echo "$(cd "$1"; git status --porcelain)"
 }
 
 # Returns "0" if the current git repository is empty (newly created)
 function isEmptyGitRepo {
-	echo `cd $1; find .git/objects -type f | wc -l`
+	echo "$(cd "$1"; find .git/objects -type f | wc -l)"
 }
 
 # Returns the number of untracked files
@@ -80,29 +67,29 @@ function isEmptyGitRepo {
 #}
 
 function getCurrentBranch {
-	if [ `isEmptyGitRepo $1` == "0" ]; then
+	if [ "$(isEmptyGitRepo "$1")" == "0" ]; then
 		echo "-"
 	else
-		(cd $1; git rev-parse --abbrev-ref HEAD)
+		(cd "$1"; git rev-parse --abbrev-ref HEAD)
 	fi
 }
 
 function printLastLogs {
 	#(cd $1; git --no-pager log --oneline -n $2)
-	(cd $1; git --no-pager log --pretty='format:%C(yellow)%h%Creset %C(blue)%ar%Creset%C(green)%d%Creset %s %C(dim normal)(%an)%Creset' -n $2)
+	(cd "$1"; git --no-pager log --pretty='format:%C(yellow)%h%Creset %C(blue)%ar%Creset%C(green)%d%Creset %s %C(dim normal)(%an)%Creset' -n "$2")
 	echo ""
 }
 
 function printLocalChanges {
 	# print changes in short form
-	(cd $1; git status -s)
+	(cd "$1"; git status -s)
 }
 
 
 function mergeDirectory {
-	isTrackingBranch=`cd $1; git rev-parse --abbrev-ref --symbolic-full-name @{u} 2>&1 > /dev/null ; echo $?`
+	isTrackingBranch=$(cd "$1"; git rev-parse --abbrev-ref --symbolic-full-name @{u} 2>&1 > /dev/null ; echo $?)
 	if [ "$isTrackingBranch" == 0 ]; then
-		(cd $1; git merge 2>&1 > /dev/null)
+		(cd "$1"; git merge 2>&1 > /dev/null)
 	else
 		log.warn "Untracked branch, skipping"
 	fi
@@ -110,7 +97,7 @@ function mergeDirectory {
 
 
 function checkCommand {
-	if [ "$1" != "local" -a "$1" != "fetch" -a "$1" != "pull" -a "$1" != "prune" ]; then
+	if [ "$1" != "local" ] && [ "$1" != "fetch" ] && [ "$1" != "pull" ] && [ "$1" != "prune" ]; then
 		echo "Invalid command: '$1'"
 		echo -e "Usage: gitc [\x1B[4mlocal\x1B[0m|fetch|pull|prune]"
 		exit 1
@@ -127,57 +114,57 @@ function checkDirectory {
 
 
 function getGitDirectories {
-	for dir in `ls -1 -d */.git 2> /dev/null`; do
+	for dir in $(ls -1 -d */.git 2> /dev/null); do
 		echo "${dir%/*}"
 	done
 }
 
 
-checkCommand $command
-dirs=`getGitDirectories`
+checkCommand "$command"
+dirs=$(getGitDirectories)
 checkDirectory
 
 # iterate thru all directories
 for dir in $dirs; do
 	# check if is directy by checking if contains .git directory
-	if [ -d $dir/.git ]; then
-		log.header $dir `getCurrentBranch $dir`
+	if [ -d "$dir/.git" ]; then
+		currentBranch=$(getCurrentBranch "${dir}")
+		log.header "${dir}" "$currentBranch"
 
-		if [ "$command" == "fetch" -o "$command" == "pull" -o "$command" == "prune" ]; then
+		if [ "$command" == "fetch" ] || [ "$command" == "pull" ] || [ "$command" == "prune" ]; then
 			if [ "$command" == "prune" ]; then
 				fetchParam="--prune"
 			fi
-			fetchCode=$(cd $dir ; git fetch $fetchParam -q 2> /dev/null ; echo $?)
+			fetchCode=$(cd "$dir" ; git fetch $fetchParam -q 2> /dev/null ; echo $?)
 
 			if [ "$fetchCode" == "0" ]; then
 
-				objects=`find $dir/.git/objects -type f | wc -l`
+				objects=$(find "${dir}"/.git/objects -type f | wc -l)
 				if [ "$objects" != "0" ]; then
-					behind=`cd $dir; git rev-list HEAD...origin/master --count`
+					behind=$(cd "$dir"; git rev-list "HEAD...origin/${currentBranch}" --count)
 				fi
 
 				if [ "$objects" == "0" ]; then
 					log.status "error"
 					log.error "Empty git repository"
 				elif [ "$behind" != "0" ]; then
-					currentBranch=`getCurrentBranch $dir`
-					remotesExisting=$(cd $dir; git ls-remote . refs/remotes/origin/$currentBranch | wc -l)
+					remotesExisting=$(cd "$dir"; git ls-remote . "refs/remotes/origin/${currentBranch}" | wc -l)
 					if [ "$remotesExisting" -eq "0" ]; then
 						log.status "clean" 
 						log.info "No remote for the current branch."
 					else
 						if [ "$command" == "fetch" ]; then
-							log.status "dirty" $behind
-							printLastLogs $dir $behind
+							log.status "dirty" "$behind"
+							printLastLogs "$dir" "$behind"
 						elif [ "$command" == "pull" ]; then
-							if [[ `isDirty $dir` ]]; then
-								log.status "error" $behind
+							if [[ $(isDirty "${dir}") ]]; then
+								log.status "error" "$behind"
 								log.error "Can not be merged: local changes"
-								printLocalChanges $dir
+								printLocalChanges "$dir"
 							else
-								log.status "dirty" $behind
-								mergeDirectory $dir
-								printLastLogs $dir $behind
+								log.status "dirty" "$behind"
+								mergeDirectory "$dir"
+								printLastLogs "$dir" "$behind"
 							fi
 						fi
 					fi
@@ -191,10 +178,10 @@ for dir in $dirs; do
 				log.error "Could not be fetched!"
 			fi
 		elif [ "$command" == "local" ]; then
-			if [[ `isDirty $dir` ]]; then
+			if [[ $(isDirty "${dir}") ]]; then
 				log.status "dirty"
 				log.warn "Has local changes"
-				printLocalChanges $dir
+				printLocalChanges "${dir}"
 			else
 				log.status "clean"
 				#log.info "No changes"
